@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-# SpaGoG
-An implementation of **"SpaGoG: Graph of Graphs to classify tabular data with large fractions of missing data"**.
-=======
 # SpaGoG: Graph of Graphs to classify tabular data with large fractions of missing data
 
 This repository is the official implementation of **"SpaGoG: Graph of Graphs to classify tabular data with large fractions of missing data"**. The project was implementes in Python 3.8. 
@@ -67,4 +63,3 @@ Our model has tested on various datasets with various missing rate. Here are the
 | PubMed       | .801 +- .004 | .828 ± .003  |
 
 where **Spam, Credit, Breast** tested with 20% missing rate, **Parkinson, Ecoli, Accent, Iris, Sonar, Wifi, Wine White, Banknote, HTRU2, Sensorless** with 50% missing rate and **Cora, CiteSeer, PubMed** tested with 99% misising rate.
->>>>>>> 8c1336674a7c284e6e84e64a8f574eb25aee10bc
