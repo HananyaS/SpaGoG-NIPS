@@ -1,10 +1,12 @@
 # SpaGoG: Graph of Graphs to classify tabular data with large fractions of missing data
 
 This repository is the official implementation of **"SpaGoG: Graph of Graphs to classify tabular data with large fractions of missing data"**. The project was implementes in Python 3.8. 
+
+[!image](figures/spagog_scheme_figure.jpg)
+
 >📋  Optional: include a graphic explaining your approach/main result, bibtex entry, link to demos, blog posts and tutorials
 
 ## Requirements
-
 To install the requirements for this implementation, please use the following command:
 
 For pip:
