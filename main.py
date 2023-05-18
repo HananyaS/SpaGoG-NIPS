@@ -27,6 +27,7 @@ parser.add_argument("--kfolds", type=int, default=10)
 args = parser.parse_args()
 
 assert args.kfolds is None or args.kfolds > 1
+args.model = args.model.lower()
 
 
 def gog_model(
@@ -111,40 +112,40 @@ def gog_model(
     if verbosity > 0 and args.kfolds is None:
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         print(f"Results on {dataset_name.upper() if dataset_name != '' else 'dataset'} with {model.upper()}:")
-        print(f"\tN epochs:\t{res_cache['learning_epochs']}")
+
         print("\tAccuracy:")
         print(
-            f"\t\tThreshold:\t{res_cache['Acc Threshold']}\n"
-            f"\t\tTrain:\t{res_cache['Train Acc']}\n"
-            f"\t\tVal:\t{res_cache['Val Acc']}"
+            f"\t\tThreshold:\t{round(res_cache['Acc Threshold'], 3)}\n"
+            f"\t\tTrain:\t{round(res_cache['Train Acc'], 3)}\n"
+            f"\t\tVal:\t{round(res_cache['Val Acc'], 3)}"
         )
 
         if evaluate_metrics:
             print(
-                f"\t\tTest:\t{res_cache['Test Acc']}"
+                f"\t\tTest:\t{round(res_cache['Test Acc'], 3)}"
             )
 
         print("\tF1:")
         print(
-            f"\t\tThreshold:\t{res_cache['F1 Threshold']}\n"
-            f"\t\tTrain:\t{res_cache['Train F1']}\n"
-            f"\t\tVal:\t{res_cache['Val F1']}"
+            f"\t\tThreshold:\t{round(res_cache['F1 Threshold'], 3)}\n"
+            f"\t\tTrain:\t{round(res_cache['Train F1'], 3)}\n"
+            f"\t\tVal:\t{round(res_cache['Val F1'], 3)}"
         )
 
         if evaluate_metrics:
             print(
-                f"\t\tTest:\t{res_cache['Test F1']}"
+                f"\t\tTest:\t{round(res_cache['Test F1'], 3)}"
             )
 
         print("\tAUC:")
         print(
-            f"\t\tTrain:\t{res_cache['Train AUC']}\n"
-            f"\t\tVal:\t{res_cache['Val AUC']}"
+            f"\t\tTrain:\t{round(res_cache['Train AUC'], 3)}\n"
+            f"\t\tVal:\t{round(res_cache['Val AUC'], 3)}"
         )
 
         if evaluate_metrics:
             print(
-                f"\t\tTest:\t{res_cache['Test AUC']}"
+                f"\t\tTest:\t{round(res_cache['Test AUC'], 3)}"
             )
 
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
@@ -209,27 +210,25 @@ if __name__ == "__main__":
         print(
             f"Results on {args.dataset.upper() if args.dataset != '' else 'dataset'} with {args.model.upper()} ({args.kfolds} cross-validation):")
 
-        print(f"\tN epochs:\t{results_all_folds['learning_epochs']}")
-
         print("\tAccuracy:")
         print(
-            f"\t\tTrain:\t{results_all_folds['Train Acc'][0]} ± {results_all_folds['Train Acc'][1]}\n"
-            f"\t\tVal:\t{results_all_folds['Val Acc'][0]} ± {results_all_folds['Val Acc'][1]}\n"
-            f"\t\tTest:\t{results_all_folds['Test Acc'][0]} ± {results_all_folds['Test Acc'][1]}"
+            f"\t\tTrain:\t{round(results_all_folds['Train Acc'][0], 3)} ± {round(results_all_folds['Train Acc'][1], 3)}\n"
+            f"\t\tVal:\t{round(results_all_folds['Val Acc'][0], 3)} ± {round(results_all_folds['Val Acc'][1], 3)}\n"
+            f"\t\tTest:\t{round(results_all_folds['Test Acc'][0], 3)} ± {round(results_all_folds['Test Acc'][1], 3)}"
         )
 
         print("\tF1:")
         print(
-            f"\t\tTrain:\t{results_all_folds['Train F1'][0]} ± {results_all_folds['Train F1'][1]}\n"
-            f"\t\tVal:\t{results_all_folds['Val F1'][0]} ± {results_all_folds['Val F1'][1]}\n"
-            f"\t\tTest:\t{results_all_folds['Test F1'][0]} ± {results_all_folds['Test F1'][1]}"
+            f"\t\tTrain:\t{round(results_all_folds['Train F1'][0], 3)} ± {round(results_all_folds['Train F1'][1], 3)}\n"
+            f"\t\tVal:\t{round(results_all_folds['Val F1'][0], 3)} ± {round(results_all_folds['Val F1'][1], 3)}\n"
+            f"\t\tTest:\t{round(results_all_folds['Test F1'][0], 3)} ± {round(results_all_folds['Test F1'][1], 3)}"
         )
 
         print("\tAUC:")
         print(
-            f"\t\tTrain:\t{results_all_folds['Train AUC'][0]} ± {results_all_folds['Train AUC'][1]}\n"
-            f"\t\tVal:\t{results_all_folds['Val AUC'][0]} ± {results_all_folds['Val AUC'][1]}\n"
-            f"\t\tTest:\t{results_all_folds['Test AUC'][0]} ± {results_all_folds['Test AUC'][1]}"
+            f"\t\tTrain:\t{round(results_all_folds['Train AUC'][0], 3)} ± {round(results_all_folds['Train AUC'][1], 3)}\n"
+            f"\t\tVal:\t{round(results_all_folds['Val AUC'][0], 3)} ± {round(results_all_folds['Val AUC'][1], 3)}\n"
+            f"\t\tTest:\t{round(results_all_folds['Test AUC'][0], 3)} ± {round(results_all_folds['Test AUC'][1], 3)}"
         )
 
     else:

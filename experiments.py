@@ -169,7 +169,7 @@ def run_gnc(
         train_mask,
         val_mask,
         test_mask,
-        n_epochs=10000,
+        n_epochs=600,
         gc_lr=params["gc_lr"],
         nc_lr=params["nc_lr"],
         gc_weight_decay=params["gc_weight_decay"],
@@ -347,9 +347,6 @@ def run_gc_nc(
 
     return y_test, cache
 
-
-# def get_default_params_file(model):
-#     return f"default_params/{model}.json"
 
 
 def get_tab_data(

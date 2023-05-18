@@ -64,7 +64,7 @@ def get_folds(data, target_col, kfolds):
         train_idx, test_idx, *_ = train_test_split(
             all_idx,
             y,
-            test_size=0.2,
+            test_size=1/kfolds,
             random_state=f,
             shuffle=True,
         )
