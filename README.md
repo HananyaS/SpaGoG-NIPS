@@ -1,8 +1,6 @@
->📋  A template README.md for code accompanying a Machine Learning paper
-
 # SpaGoG: Graph of Graphs to classify tabular data with large fractions of missing data
 
-This repository is the official implementation of **"SpaGoG: Graph of Graphs to classify tabular data with large fractions of missing data"** in python 3.8. 
+This repository is the official implementation of **"SpaGoG: Graph of Graphs to classify tabular data with large fractions of missing data"**. The project was implementes in Python 3.8. 
 
 >📋  Optional: include a graphic explaining your approach/main result, bibtex entry, link to demos, blog posts and tutorials
 
@@ -44,27 +42,25 @@ Args:
 
 ## Results
 
-Our model achieves the following performance on :
-
+Our model has tested on various datasets with various missing rate. Here are the results:
 | Missing Rate | Dataset      | GNC          | GC+NC       |
 | ------------ | ------------ | ------------ | ----------- |
-| 20%          | Spam         | .959 ± .005  | .965 ± .005 |
-|| Credit       | .755 ± .008  | .759 ± .006  |
-|| Breast       | .98 +- .011  | .986 ± .01   |
-| 50%          | Parkinson    | .785 +- .027 | .781 ± .051 |
-|| Ecoli        | .588 ± .04   | .571 ± .05   |
-|| Accent       | .486 ± .038  | .489 ± .055  |
-|| Iris         | .763 ± .08   | .74 ± .122   |
-|| Sonar        | .719 ± .047  | .705 ± .040  |
-|| Wifi         | .819 +- .008 | .833 ± .007  |
-|| Wine White   | .472 ± .018  | .482 ± .011  |
-|| Banknote     | .787 +- .013 | .776 ± .022  |
-|| HTRU2        | .965 ± .002  | .9642 ± .003 |
-|| Sensorless   | .776 +- .008 | .730 ± .008  |
-| 99%          | Cora         | .676 +- .016 | .770 ± .013 |
-|| CiteSeer     | .509 +- .016 | .512 ± .141  |
-|| PubMed       | .801 +- .004 | .828 ± .003  |
+| Spam         | .959 ± .005  | .965 ± .005 |
+| Credit       | .755 ± .008  | .759 ± .006  |
+| Breast       | .98 +- .011  | .986 ± .01   |
+| Parkinson    | .785 +- .027 | .781 ± .051 |
+| Ecoli        | .588 ± .04   | .571 ± .05   |
+| Accent       | .486 ± .038  | .489 ± .055  |
+| Iris         | .763 ± .08   | .74 ± .122   |
+| Sonar        | .719 ± .047  | .705 ± .040  |
+| Wifi         | .819 +- .008 | .833 ± .007  |
+| Wine White   | .472 ± .018  | .482 ± .011  |
+| Banknote     | .787 +- .013 | .776 ± .022  |
+| HTRU2        | .965 ± .002  | .9642 ± .003 |
+| Sensorless   | .776 +- .008 | .730 ± .008  |
+| Cora         | .676 +- .016 | .770 ± .013 |
+| CiteSeer     | .509 +- .016 | .512 ± .141  |
+| PubMed       | .801 +- .004 | .828 ± .003  |
 
-
->📋  Include a table of results from your paper, and link back to the leaderboard for clarity and context. If your main result is a figure, include that figure and link to the command or notebook to reproduce it. 
+where **Spam, Credit, Breast** tested with 20% missing rate, **Parkinson, Ecoli, Accent, Iris, Sonar, Wifi, Wine White, Banknote, HTRU2, Sensorless** with 50% missing rate and **Cora, CiteSeer, PubMed** tested with 99% misising rate.
 
