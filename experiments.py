@@ -20,6 +20,7 @@ def run_gc(
         evaluate_metrics: bool = True,
         probs: bool = False,
         to_numpy: bool = True,
+        f2m: bool = False,
 ):
     graphs_dataset, *_ = GraphsDataset.from_tab(
         tab_data=tab_dataset,
@@ -29,6 +30,7 @@ def run_gc(
             "k": params.get("k", 3),
         },
         calc_intra_edges=True,
+        f2m=f2m
     )
 
     train_loader = graphs_dataset.train.to_loader(batch_size=params["batch_size"])
@@ -82,6 +84,8 @@ def run_gnc(
         evaluate_metrics: bool = True,
         probs: bool = False,
         to_numpy: bool = True,
+        f2m: bool = False,
+        find_beta: bool = False,
 ):
     graphs_dataset, inter_samples_edges, masks = GraphsDataset.from_tab(
         tab_data=tab_dataset,
@@ -90,7 +94,8 @@ def run_gnc(
             "k": params.get("k", 30),
         },
         inter_sample_edges=inter_sample_edges,
-        calc_intra_edges=True
+        calc_intra_edges=True,
+        f2m=f2m
     )
 
     train_mask, val_mask, test_mask = masks
@@ -103,7 +108,6 @@ def run_gnc(
         str(params["nc_activation_2"]),
     ]
 
-    # if gc_pretrain:
     if params["gc_pretrain"]:
         gc_params = params["gc_params"]
 
@@ -178,7 +182,8 @@ def run_gnc(
         batch_size=params.get("batch_size", 10),
         early_stopping_patience=early_stopping,
         verbose=verbose,
-        clf_from=params["clf_from"]  # clf_from
+        clf_from=params["clf_from"],  # clf_from
+        find_beta=find_beta,
     )
 
     y_test = model.predict(all_graphs_loader, inter_samples_edges.T, test_mask, clf_from=params["clf_from"],
@@ -205,6 +210,7 @@ def run_gc_nc(
         evaluate_metrics: bool = True,
         probs: bool = False,
         to_numpy: bool = True,
+        f2m: bool = False,
 ):
     graphs_dataset, inter_sample_edges, masks = GraphsDataset.from_tab(
         tab_data=tab_dataset,
@@ -213,7 +219,8 @@ def run_gc_nc(
             "k": params.get("k", 30),
         },
         inter_sample_edges=inter_sample_edges,
-        calc_intra_edges=True
+        calc_intra_edges=True,
+        f2m=f2m
     )
 
     train_graphs_loader = graphs_dataset.train.to_loader(

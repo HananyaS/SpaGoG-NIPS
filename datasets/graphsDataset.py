@@ -370,7 +370,14 @@ class GraphsDataset:
 
     @property
     def num_classes(self):
-        return self.train.num_classes
+        # return self.train.num_classes
+        ys = [self.train.Y]
+        if self.val_exists:
+            ys.append(self.val.Y)
+        if self.test_exists:
+            ys.append(self.test.Y)
+
+        return torch.cat(ys).unique().shape[0]
 
     @property
     def train_len(self):

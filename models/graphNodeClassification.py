@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import torch
+import tqdm
 from torch import nn
 from torch import optim
 
@@ -27,7 +28,17 @@ from torch.nn.functional import one_hot
 
 
 class GraphNodeClassification(nn.Module, AbstractModel):
-    def predict(self, graphs_loader, inter_samples_edges, mask, clf_from, probs, to_numpy=True, *args, **kwargs):
+    def predict(
+        self,
+        graphs_loader,
+        inter_samples_edges,
+        mask,
+        clf_from,
+        probs,
+        to_numpy=True,
+        *args,
+        **kwargs,
+    ):
         final_output, gc_output = self(
             graphs_loader,
             inter_samples_edges,
@@ -55,10 +66,10 @@ class GraphNodeClassification(nn.Module, AbstractModel):
         pass
 
     def __init__(
-            self,
-            gc_kwargs: Dict = {},
-            nc_kwargs: Dict = {},
-            gc_model: ValuesAndGraphStructure = None,
+        self,
+        gc_kwargs: Dict = {},
+        nc_kwargs: Dict = {},
+        gc_model: ValuesAndGraphStructure = None,
     ):
         super(GraphNodeClassification, self).__init__()
         if gc_model is not None:
@@ -70,10 +81,10 @@ class GraphNodeClassification(nn.Module, AbstractModel):
         self.nc_model = NodeClassification(**nc_kwargs)
         self.bin = self.gc_model.num_classes == 2
 
-        if gc_kwargs["embedding_layer"] == 'first':
+        if gc_kwargs["embedding_layer"] == "first":
             self.batch_norm = nn.BatchNorm1d(num_features=self.gc_model.fc1.in_features)
 
-        elif gc_kwargs["embedding_layer"] == 'mid':
+        elif gc_kwargs["embedding_layer"] == "mid":
             self.batch_norm = nn.BatchNorm1d(num_features=self.gc_model.fc2.in_features)
 
         else:
@@ -86,10 +97,10 @@ class GraphNodeClassification(nn.Module, AbstractModel):
         return "Graph Node Classification"
 
     def forward(
-            self,
-            graphs_loader,
-            inter_sample_edges,
-            mask: list = None,
+        self,
+        graphs_loader,
+        inter_sample_edges,
+        mask: list = None,
     ):
         first_batch = True
 
@@ -120,8 +131,8 @@ class GraphNodeClassification(nn.Module, AbstractModel):
 
     @staticmethod
     def _extract_from_tab(
-            graphs_dataset: GraphsDataset,
-            batch_size: int = 32,
+        graphs_dataset: GraphsDataset,
+        batch_size: int = 32,
     ):
         graphs_train_loader = graphs_dataset.get_train_data(
             as_loader=True, batch_size=batch_size
@@ -142,30 +153,30 @@ class GraphNodeClassification(nn.Module, AbstractModel):
         )
 
     def fit(
-            self,
-            graphs_dataset: GraphsDataset,
-            inter_samples_edges: torch.Tensor,
-            train_mask: list,
-            val_mask: list,
-            test_mask: list,
-            n_epochs: int = 100,
-            batch_size: int = 32,
-            optimizer: torch.optim = optim.Adam,
-            alpha: float = 2,
-            early_stopping_patience: int = -1,
-            verbose: bool = False,
-            clf_from: str = 'nc',
-            gc_lr: float = 0.001,
-            gc_weight_decay: float = 0,
-            nc_lr: float = 0.001,
-            nc_weight_decay: float = 0,
+        self,
+        graphs_dataset: GraphsDataset,
+        inter_samples_edges: torch.Tensor,
+        train_mask: list,
+        val_mask: list,
+        test_mask: list,
+        n_epochs: int = 100,
+        batch_size: int = 32,
+        optimizer: torch.optim = optim.Adam,
+        alpha: float = 0.5,
+        early_stopping_patience: int = -1,
+        verbose: bool = False,
+        clf_from: str = "nc",
+        gc_lr: float = 0.001,
+        gc_weight_decay: float = 0,
+        nc_lr: float = 0.001,
+        nc_weight_decay: float = 0,
+        find_beta: bool = True,
     ):
-
         given_test_y = graphs_dataset.test.Y is not None
 
         if early_stopping_patience > 0:
             c = 0
-            min_val_loss = np.inf
+            max_val_auc = -np.inf
 
         (
             graphs_train_loader,
@@ -203,7 +214,8 @@ class GraphNodeClassification(nn.Module, AbstractModel):
 
         nc_optimizer = optimizer(
             list(self.nc_model.parameters()) + list(self.batch_norm.parameters()),
-            lr=nc_lr, weight_decay=nc_weight_decay,
+            lr=nc_lr,
+            weight_decay=nc_weight_decay,
         )
 
         n_classes = all_graphs_loader.dataset.gdp.num_classes
@@ -235,7 +247,9 @@ class GraphNodeClassification(nn.Module, AbstractModel):
             train_loss_total = (1 - alpha) * train_loss_gc + alpha * train_loss_final
             train_loss_total.backward()
 
-            train_gc_final_loss_rel.append((1 - alpha) * train_loss_gc / (alpha * train_loss_final))
+            train_gc_final_loss_rel.append(
+                (1 - alpha) * train_loss_gc / (alpha * train_loss_final)
+            )
 
             gc_optimizer.step()
             nc_optimizer.step()
@@ -244,15 +258,28 @@ class GraphNodeClassification(nn.Module, AbstractModel):
             train_final_losses.append(train_loss_final.item())
             train_total_losses.append(train_loss_total.item())
 
-            train_gc_auc = roc_auc_score(
-                one_hot(train_labels.view(-1).long(), n_classes).cpu().detach().numpy(),
-                gc_output.cpu().detach().numpy(),
-            )
+            try:
+                train_gc_auc = roc_auc_score(
+                    one_hot(train_labels.view(-1).long(), n_classes)
+                    .cpu()
+                    .detach()
+                    .numpy(),
+                    gc_output.cpu().detach().numpy(),
+                )
+            except:
+                train_gc_auc = None
 
-            train_final_auc = roc_auc_score(
-                one_hot(train_labels.view(-1).long(), n_classes).cpu().detach().numpy(),
-                final_output.cpu().detach().numpy(),
-            )
+            try:
+                train_final_auc = roc_auc_score(
+                    one_hot(train_labels.view(-1).long(), n_classes)
+                    .cpu()
+                    .detach()
+                    .numpy(),
+                    final_output.cpu().detach().numpy(),
+                )
+
+            except:
+                train_final_auc = None
 
             train_gc_aucs.append(train_gc_auc)
             train_final_aucs.append(train_final_auc)
@@ -277,27 +304,37 @@ class GraphNodeClassification(nn.Module, AbstractModel):
 
                 val_loss_total = (1 - alpha) * val_loss_gc + alpha * val_loss_final
 
-                val_final_gc_loss_rel.append((1 - alpha) * val_loss_gc / (alpha * val_loss_final))
+                val_final_gc_loss_rel.append(
+                    (1 - alpha) * val_loss_gc / (alpha * val_loss_final)
+                )
 
                 val_gc_losses.append(val_loss_gc.item())
                 val_final_losses.append(val_loss_final.item())
                 val_total_losses.append(val_loss_total.item())
 
-                val_gc_auc = roc_auc_score(
-                    one_hot(val_labels.view(-1).long(), n_classes)
-                    .cpu()
-                    .detach()
-                    .numpy(),
-                    gc_output.cpu().detach().numpy(),
-                )
+                try:
+                    val_gc_auc = roc_auc_score(
+                        one_hot(val_labels.view(-1).long(), n_classes)
+                        .cpu()
+                        .detach()
+                        .numpy(),
+                        gc_output.cpu().detach().numpy(),
+                    )
 
-                val_final_auc = roc_auc_score(
-                    one_hot(val_labels.view(-1).long(), n_classes)
-                    .cpu()
-                    .detach()
-                    .numpy(),
-                    final_output.cpu().detach().numpy(),
-                )
+                except:
+                    val_gc_auc = None
+
+                try:
+                    val_final_auc = roc_auc_score(
+                        one_hot(val_labels.view(-1).long(), n_classes)
+                        .cpu()
+                        .detach()
+                        .numpy(),
+                        final_output.cpu().detach().numpy(),
+                    )
+
+                except:
+                    val_final_auc = None
 
                 val_gc_aucs.append(val_gc_auc)
                 val_final_aucs.append(val_final_auc)
@@ -318,8 +355,8 @@ class GraphNodeClassification(nn.Module, AbstractModel):
                 )
 
             if early_stopping_patience > 0:
-                if val_loss_total < min_val_loss:
-                    min_val_loss = val_loss_total
+                if (val_final_auc + val_gc_auc) / 2 > max_val_auc:
+                    max_val_auc = val_final_auc
                     c = 0
 
                 else:
@@ -364,42 +401,69 @@ class GraphNodeClassification(nn.Module, AbstractModel):
                 test_mask,
             )
 
-        if clf_from == 'nc':
-            final_output_train = nn.Softmax(dim=1)(final_output_train)
-            final_output_val = nn.Softmax(dim=1)(final_output_val)
+        if find_beta:
+            best_beta, best_loss = -1, np.inf
 
-            if given_test_y:
-                final_output_test = nn.Softmax(dim=1)(final_output_test)
+            for beta in tqdm.tqdm(
+                np.array(range(0, 101)) / 100, desc="Searching for best beta"
+            ):
+                output = beta * final_output_train + (1 - beta) * gc_output_train
+                train_loss = nn.CrossEntropyLoss()(
+                    output, train_labels.long().view(-1)
+                ).item()
+
+                if train_loss < best_loss:
+                    best_loss = train_loss
+                    best_beta = beta
+
+            print(f"Best beta is {best_beta} with loss of {best_loss} on training")
 
         else:
-            gc_output_train = nn.Softmax(dim=1)(gc_output_train)
-            gc_output_val = nn.Softmax(dim=1)(gc_output_val)
+            best_beta = int(clf_from == "nc")
 
-            if given_test_y:
-                gc_output_test = nn.Softmax(dim=1)(gc_output_test)
-
-        train_auc = roc_auc_score(
-            one_hot(train_labels.view(-1).long(), n_classes).cpu().detach().numpy(),
-            (final_output_train if clf_from == 'nc' else gc_output_train).cpu().detach().numpy(),
+        mixed_output_train = (
+            best_beta * final_output_train + (1 - best_beta) * gc_output_train
         )
-
-        val_auc = roc_auc_score(
-            one_hot(val_labels.view(-1).long(), n_classes).cpu().detach().numpy(),
-            (final_output_val if clf_from == 'nc' else gc_output_val).cpu().detach().numpy(),
-        )
+        mixed_output_val = best_beta * final_output_val + (1 - best_beta) * gc_output_val
 
         if given_test_y:
-            test_auc = roc_auc_score(
-                one_hot(test_labels.view(-1).long(), n_classes).cpu().detach().numpy(),
-                (final_output_test if clf_from == 'nc' else gc_output_test).cpu().detach().numpy(),
+            mixed_output_test = (
+                best_beta * final_output_test + (1 - best_beta) * gc_output_test
             )
 
-        if self.bin:
-            if clf_from == 'nc':
-                pos_output_train = final_output_train[:, 1]
+        try:
+            train_auc = roc_auc_score(
+                one_hot(train_labels.view(-1).long(), n_classes).cpu().detach().numpy(),
+                mixed_output_train.cpu().detach().numpy(),
+            )
 
-            else:
-                pos_output_train = gc_output_train[:, 1]
+        except:
+            train_auc = None
+
+        try:
+            val_auc = roc_auc_score(
+                one_hot(val_labels.view(-1).long(), n_classes).cpu().detach().numpy(),
+                mixed_output_val.cpu().detach().numpy(),
+            )
+
+        except:
+            val_auc = None
+
+        if given_test_y:
+            try:
+                test_auc = roc_auc_score(
+                    one_hot(test_labels.view(-1).long(), n_classes)
+                    .cpu()
+                    .detach()
+                    .numpy(),
+                    mixed_output_test.cpu().detach().numpy(),
+                )
+
+            except:
+                test_auc = None
+
+        if self.bin:
+            pos_output_train = mixed_output_train[:, 1]
 
             (
                 best_train_acc,
@@ -412,11 +476,7 @@ class GraphNodeClassification(nn.Module, AbstractModel):
                 threshold=None,
             )
 
-            if clf_from == 'nc':
-                pos_output_val = final_output_val[:, 1]
-
-            else:
-                pos_output_val = gc_output_val[:, 1]
+            pos_output_val = mixed_output_val[:, 1]
 
             best_val_acc, *_ = find_best_metrics_bin(
                 pos_output_val,
@@ -431,10 +491,7 @@ class GraphNodeClassification(nn.Module, AbstractModel):
             )
 
             if given_test_y:
-                if clf_from == 'nc':
-                    pos_output_test = final_output_test[:, 1]
-                else:
-                    pos_output_test = gc_output_test[:, 1]
+                pos_output_test = mixed_output_test[:, 1]
 
                 best_test_acc, *_ = find_best_metrics_bin(
                     pos_output_test,
@@ -449,35 +506,20 @@ class GraphNodeClassification(nn.Module, AbstractModel):
                 )
 
         else:
-            if clf_from == 'nc':
-                best_train_acc, best_train_f1 = find_best_metrics_multi(
-                    final_output_train, train_labels
+            best_train_acc, best_train_f1 = find_best_metrics_multi(
+                mixed_output_train, train_labels
+            )
+
+            best_val_acc, best_val_f1 = find_best_metrics_multi(
+                mixed_output_val, val_labels
+            )
+
+            if given_test_y:
+                best_test_acc, best_test_f1 = find_best_metrics_multi(
+                    mixed_output_test, test_labels
                 )
 
-                best_val_acc, best_val_f1 = find_best_metrics_multi(
-                    final_output_val, val_labels
-                )
-
-                if given_test_y:
-                    best_test_acc, best_test_f1 = find_best_metrics_multi(
-                        final_output_test, test_labels
-                    )
-
-            else:
-                best_train_acc, best_train_f1 = find_best_metrics_multi(
-                    gc_output_train, train_labels
-                )
-
-                best_val_acc, best_val_f1 = find_best_metrics_multi(
-                    gc_output_val, val_labels
-                )
-
-                if given_test_y:
-                    best_test_acc, best_test_f1 = find_best_metrics_multi(
-                        gc_output_test, test_labels
-                    )
-
-            best_acc_threshold, best_f1_threshold = -1, -1
+        best_acc_threshold, best_f1_threshold = -1, -1
 
         if verbose:
             print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
@@ -493,13 +535,10 @@ class GraphNodeClassification(nn.Module, AbstractModel):
         cache = {
             "Train Acc": best_train_acc,
             "Val Acc": best_val_acc,
-            # "Test Acc": best_test_acc,
             "Train F1": best_train_f1,
             "Val F1": best_val_f1,
-            # "Test F1": best_test_f1,
             "Train AUC": train_auc,
             "Val AUC": val_auc,
-            # "Test AUC": test_auc,
             "Acc Threshold": best_acc_threshold,
             "F1 Threshold": best_f1_threshold,
             "learning_epochs": epoch,

@@ -18,37 +18,52 @@ os.chdir(PROJECT_DIR)
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--model", type=str)
-parser.add_argument("--dataset", type=str)
+str2bool = lambda x: x.lower() in ["true", "1"]
+
+parser.add_argument("--model", type=str, default="gnc")
+parser.add_argument("--dataset", type=str, default="Iris")
 parser.add_argument("--feature_selection", type=int, default=None)
 parser.add_argument("--verbosity", type=int, default=1)
 parser.add_argument("--kfolds", type=int, default=10)
+parser.add_argument("--f2m", type=str2bool, default=True)
+parser.add_argument("--beta", type=str2bool, default=False)
+parser.add_argument("--seed", type=int, default=42)
 
 args = parser.parse_args()
 
 assert args.kfolds is None or args.kfolds > 1
-args.model = args.model.lower()
+
+torch.manual_seed(args.seed)
+np.random.seed(args.seed)
 
 
 def gog_model(
-        model: str,
-        train_X: pd.DataFrame,
-        train_y: pd.DataFrame,
-        test_X: pd.DataFrame,
-        test_y: pd.DataFrame = None,
-        val_X: pd.DataFrame = None,
-        val_y: pd.DataFrame = None,
-        evaluate_metrics: bool = True,
-        dataset_name: str = "",
-        feature_selection: int = 100,
-        edges: pd.DataFrame = None,
-        probs: bool = False,
-        to_numpy: bool = False,
-        verbosity: int = 0,
-        **spec_params
+    model: str,
+    train_X: pd.DataFrame,
+    train_y: pd.DataFrame,
+    test_X: pd.DataFrame,
+    test_y: pd.DataFrame = None,
+    val_X: pd.DataFrame = None,
+    val_y: pd.DataFrame = None,
+    evaluate_metrics: bool = True,
+    dataset_name: str = "",
+    feature_selection: int = 100,
+    edges: pd.DataFrame = None,
+    probs: bool = False,
+    to_numpy: bool = False,
+    verbosity: int = 0,
+    f2m: bool = False,
+    find_beta: bool = False,
+    **spec_params,
 ):
-    assert not evaluate_metrics or test_y is not None, "Please provide test_Y to evaluate metrics"
-    assert model in ["gc", "gnc", "gc+nc"], "Please provide a valid model {gc, gnc, gc+nc}}"
+    assert (
+        not evaluate_metrics or test_y is not None
+    ), "Please provide test_Y to evaluate metrics"
+    assert model in [
+        "gc",
+        "gnc",
+        "gc+nc",
+    ], "Please provide a valid model {gc, gnc, gc+nc}}"
     assert verbosity in [0, 1, 2], "Please provide a valid verbosity level {0, 1, 2}"
 
     if verbosity > 0:
@@ -70,10 +85,17 @@ def gog_model(
         elif "gc_params" in params.keys() and k in params["gc_params"].keys():
             params["gc_params"][k] = v
 
-    assert "embedding_layer" not in params.keys() or params["embedding_layer"] in ['one_before_last', 'first', 'mid']
-    assert "gc_params" not in params.keys() or "embedding_layer" not in params["gc_params"].keys() or \
-           params["gc_params"]["embedding_layer"] in ['one_before_last', 'first', 'mid']
-    assert "clf_from" not in params.keys() or params["clf_from"] in ['gc', 'nc']
+    assert "embedding_layer" not in params.keys() or params["embedding_layer"] in [
+        "one_before_last",
+        "first",
+        "mid",
+    ]
+    assert (
+        "gc_params" not in params.keys()
+        or "embedding_layer" not in params["gc_params"].keys()
+        or params["gc_params"]["embedding_layer"] in ["one_before_last", "first", "mid"]
+    )
+    assert "clf_from" not in params.keys() or params["clf_from"] in ["gc", "nc"]
 
     tab_dataset = get_tab_data(
         train_X=train_X,
@@ -96,57 +118,59 @@ def gog_model(
     else:
         run_func = run_gc_nc
 
-    y_test, res_cache = run_func(
-        tab_dataset,
-        params,
-        inter_sample_edges=inter_sample_edges,
-        verbose=verbosity == 2,
-        evaluate_metrics=evaluate_metrics,
-        probs=probs,
-        to_numpy=to_numpy,
-    )
+    kwargs = {
+        "tab_dataset": tab_dataset,
+        "params": params,
+        "inter_sample_edges": inter_sample_edges,
+        "verbose": verbosity == 2,
+        "evaluate_metrics": evaluate_metrics,
+        "probs": probs,
+        "to_numpy": to_numpy,
+        "f2m": f2m,
+    }
+
+    if model == 'gnc':
+        kwargs['find_beta'] = find_beta
+
+    y_test, res_cache = run_func(**kwargs)
 
     if verbosity == 2:
         print()
 
     if verbosity > 0 and args.kfolds is None:
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-        print(f"Results on {dataset_name.upper() if dataset_name != '' else 'dataset'} with {model.upper()}:")
-
+        print(
+            f"Results on {dataset_name.upper() if dataset_name != '' else 'dataset'} with {model.upper()}:"
+        )
+        print(f"\tN epochs:\t{res_cache['learning_epochs']}")
         print("\tAccuracy:")
         print(
-            f"\t\tThreshold:\t{round(res_cache['Acc Threshold'], 3)}\n"
-            f"\t\tTrain:\t{round(res_cache['Train Acc'], 3)}\n"
-            f"\t\tVal:\t{round(res_cache['Val Acc'], 3)}"
+            f"\t\tThreshold:\t{res_cache['Acc Threshold']}\n"
+            f"\t\tTrain:\t{res_cache['Train Acc']}\n"
+            f"\t\tVal:\t{res_cache['Val Acc']}"
         )
 
         if evaluate_metrics:
-            print(
-                f"\t\tTest:\t{round(res_cache['Test Acc'], 3)}"
-            )
+            print(f"\t\tTest:\t{res_cache['Test Acc']}")
 
         print("\tF1:")
         print(
-            f"\t\tThreshold:\t{round(res_cache['F1 Threshold'], 3)}\n"
-            f"\t\tTrain:\t{round(res_cache['Train F1'], 3)}\n"
-            f"\t\tVal:\t{round(res_cache['Val F1'], 3)}"
+            f"\t\tThreshold:\t{res_cache['F1 Threshold']}\n"
+            f"\t\tTrain:\t{res_cache['Train F1']}\n"
+            f"\t\tVal:\t{res_cache['Val F1']}"
         )
 
         if evaluate_metrics:
-            print(
-                f"\t\tTest:\t{round(res_cache['Test F1'], 3)}"
-            )
+            print(f"\t\tTest:\t{res_cache['Test F1']}")
 
         print("\tAUC:")
         print(
-            f"\t\tTrain:\t{round(res_cache['Train AUC'], 3)}\n"
-            f"\t\tVal:\t{round(res_cache['Val AUC'], 3)}"
+            f"\t\tTrain:\t{res_cache['Train AUC']}\n"
+            f"\t\tVal:\t{res_cache['Val AUC']}"
         )
 
         if evaluate_metrics:
-            print(
-                f"\t\tTest:\t{round(res_cache['Test AUC'], 3)}"
-            )
+            print(f"\t\tTest:\t{res_cache['Test AUC']}")
 
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
@@ -191,9 +215,21 @@ if __name__ == "__main__":
             test_X, test_y = split_X_y(test, target_col)
             val_X, val_y = split_X_y(val, target_col)
 
-            _, fold_results = gog_model(train_X=train_X, train_y=train_Y, test_X=test_X, test_y=test_y, val_X=val_X,
-                                        val_y=val_y, model=args.model, evaluate_metrics=test_y is not None,
-                                        verbosity=args.verbosity, feature_selection=args.feature_selection, edges=edges)
+            _, fold_results = gog_model(
+                train_X=train_X,
+                train_y=train_Y,
+                test_X=test_X,
+                test_y=test_y,
+                val_X=val_X,
+                val_y=val_y,
+                model=args.model,
+                evaluate_metrics=test_y is not None,
+                verbosity=args.verbosity,
+                feature_selection=args.feature_selection,
+                edges=edges,
+                f2m=args.f2m,
+                find_beta=args.beta,
+            )
 
             if fold == 0:
                 results_all_folds = {k: [v] for k, v in fold_results.items()}
@@ -203,39 +239,66 @@ if __name__ == "__main__":
                     results_all_folds[k].append(v)
 
         for k, v in results_all_folds.items():
-            results_all_folds[k] = np.mean(v), np.std(v)
+            if None in v:
+                results_all_folds[k] = None
+            else:
+                results_all_folds[k] = np.mean(v), np.std(v)
 
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
         print(
-            f"Results on {args.dataset.upper() if args.dataset != '' else 'dataset'} with {args.model.upper()} ({args.kfolds} cross-validation):")
+            f"Results on {args.dataset.upper() if args.dataset != '' else 'dataset'} with {args.model.upper()} ({args.kfolds} cross-validation):"
+        )
+
+        print(f"\tN epochs:\t{results_all_folds['learning_epochs']}")
 
         print("\tAccuracy:")
         print(
-            f"\t\tTrain:\t{round(results_all_folds['Train Acc'][0], 3)} ± {round(results_all_folds['Train Acc'][1], 3)}\n"
-            f"\t\tVal:\t{round(results_all_folds['Val Acc'][0], 3)} ± {round(results_all_folds['Val Acc'][1], 3)}\n"
-            f"\t\tTest:\t{round(results_all_folds['Test Acc'][0], 3)} ± {round(results_all_folds['Test Acc'][1], 3)}"
+            f"\t\tTrain:\t{results_all_folds['Train Acc'][0]} ± {results_all_folds['Train Acc'][1]}\n"
+            f"\t\tVal:\t{results_all_folds['Val Acc'][0]} ± {results_all_folds['Val Acc'][1]}\n"
+            f"\t\tTest:\t{results_all_folds['Test Acc'][0]} ± {results_all_folds['Test Acc'][1]}"
         )
 
         print("\tF1:")
         print(
-            f"\t\tTrain:\t{round(results_all_folds['Train F1'][0], 3)} ± {round(results_all_folds['Train F1'][1], 3)}\n"
-            f"\t\tVal:\t{round(results_all_folds['Val F1'][0], 3)} ± {round(results_all_folds['Val F1'][1], 3)}\n"
-            f"\t\tTest:\t{round(results_all_folds['Test F1'][0], 3)} ± {round(results_all_folds['Test F1'][1], 3)}"
+            f"\t\tTrain:\t{results_all_folds['Train F1'][0]} ± {results_all_folds['Train F1'][1]}\n"
+            f"\t\tVal:\t{results_all_folds['Val F1'][0]} ± {results_all_folds['Val F1'][1]}\n"
+            f"\t\tTest:\t{results_all_folds['Test F1'][0]} ± {results_all_folds['Test F1'][1]}"
         )
 
         print("\tAUC:")
-        print(
-            f"\t\tTrain:\t{round(results_all_folds['Train AUC'][0], 3)} ± {round(results_all_folds['Train AUC'][1], 3)}\n"
-            f"\t\tVal:\t{round(results_all_folds['Val AUC'][0], 3)} ± {round(results_all_folds['Val AUC'][1], 3)}\n"
-            f"\t\tTest:\t{round(results_all_folds['Test AUC'][0], 3)} ± {round(results_all_folds['Test AUC'][1], 3)}"
-        )
+
+        if None in (
+            results_all_folds["Train AUC"],
+            results_all_folds["Val AUC"],
+            results_all_folds["Test AUC"],
+        ):
+            print("\t\tNone\n")
+
+        else:
+            print(
+                f"\t\tTrain:\t{results_all_folds['Train AUC'][0]} ± {results_all_folds['Train AUC'][1]}\n"
+                f"\t\tVal:\t{results_all_folds['Val AUC'][0]} ± {results_all_folds['Val AUC'][1]}\n"
+                f"\t\tTest:\t{results_all_folds['Test AUC'][0]} ± {results_all_folds['Test AUC'][1]}"
+            )
 
     else:
         train_X, train_Y = split_X_y(train, target_col)
         test_X, test_y = split_X_y(test, target_col)
         val_X, val_y = split_X_y(val, target_col)
 
-        results = gog_model(train_X=train_X, train_y=train_Y, test_X=test_X, test_y=test_y, val_X=val_X,
-                            val_y=val_y, model=args.model, evaluate_metrics=test_y is not None,
-                            verbosity=args.verbosity, feature_selection=args.feature_selection, edges=edges)
+        results = gog_model(
+            train_X=train_X,
+            train_y=train_Y,
+            test_X=test_X,
+            test_y=test_y,
+            val_X=val_X,
+            val_y=val_y,
+            model=args.model,
+            evaluate_metrics=test_y is not None,
+            verbosity=args.verbosity,
+            feature_selection=args.feature_selection,
+            edges=edges,
+            f2m=args.f2m,
+            find_beta=args.beta,
+        )

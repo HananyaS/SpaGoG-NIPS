@@ -14,18 +14,19 @@ from itertools import combinations
 
 
 def tab2graphs(
-        tab_data,
-        store_as_adj: bool = True,
-        name: str = None,
-        include_edge_weights: bool = False,
-        edge_weights_method: str = "corr",
-        fill_data_method: str = "gfp",
-        knn_kwargs: dict = {"distance": "euclidian"},
-        gfp_kwargs: dict = {},
-        val_mask: list = None,
-        test_mask: list = None,
-        inter_sample_edges: torch.Tensor = None,
-        calc_intra_edges: bool = True
+    tab_data,
+    store_as_adj: bool = True,
+    name: str = None,
+    include_edge_weights: bool = False,
+    edge_weights_method: str = "corr",
+    fill_data_method: str = "gfp",
+    knn_kwargs: dict = {"distance": "euclidian"},
+    gfp_kwargs: dict = {},
+    val_mask: list = None,
+    test_mask: list = None,
+    inter_sample_edges: torch.Tensor = None,
+    calc_intra_edges: bool = True,
+    f2m: bool = False,
 ):
     assert not include_edge_weights or edge_weights_method in ["corr", None]
     assert fill_data_method in ["gfp", "zeros"]
@@ -37,7 +38,14 @@ def tab2graphs(
         tab_data_ = deepcopy(tab_data)
 
     if fill_data_method == "gfp":
-        imputed_data_, knn_inter_sample_edges, mean_dist_all, mean_dist_neigh, num_nulls, dists = fill_data_gfp(
+        (
+            imputed_data_,
+            knn_inter_sample_edges,
+            mean_dist_all,
+            mean_dist_neigh,
+            num_nulls,
+            dists,
+        ) = fill_data_gfp(
             tab_data_,
             knn_kwargs=knn_kwargs,
             gfp_kwargs=gfp_kwargs,
@@ -63,6 +71,11 @@ def tab2graphs(
                 pd.DataFrame(tab_data_.cpu().detach().numpy()).corr().fillna(0).values
             )
 
+            p_i = (tab_data_ == tab_data_).float().mean(0).numpy()
+            p_i_I = np.diag(p_i)
+            edge_weights = np.matmul(np.matmul(p_i_I, edge_weights), p_i_I)
+
+
         else:
             raise NotImplementedError
 
@@ -72,18 +85,34 @@ def tab2graphs(
     X_list = list(imputed_data_)
 
     if calc_intra_edges:
-        edge_list = list(
-            map(
-                lambda s: torch.from_numpy(
-                    lst_to_mat(
-                        np.array(list(combinations(np.where(s.cpu() == s.cpu())[0], r=2))),
-                        len(s),
-                        edge_weights,
-                    )
-                ),
-                list(tab_data_),
+        if f2m:
+            edge_list = (
+                torch.from_numpy(edge_weights)
+                .unsqueeze(0)
+                .repeat([tab_data_.shape[0], 1, 1])
             )
-        )
+
+            masks = torch.repeat_interleave(
+                ~torch.isnan(tab_data_).unsqueeze(-1), tab_data_.shape[1], dim=2
+            ).long()
+            edge_list = edge_list * masks
+            edge_list = list(edge_list)
+
+        else:
+            edge_list = list(
+                map(
+                    lambda s: torch.from_numpy(
+                        lst_to_mat(
+                            np.array(
+                                list(combinations(np.where(s.cpu() == s.cpu())[0], r=2))
+                            ),
+                            len(s),
+                            edge_weights,
+                        )
+                    ),
+                    list(tab_data_),
+                )
+            )
 
     else:
         edge_list = None
@@ -157,10 +186,10 @@ def lst_to_mat(z, n, edge_weights=None, numpy=True):
 
 
 def get_knn_adj(
-        tab_data: torch.Tensor,
-        val_mask: list = None,
-        test_mask: list = None,
-        **kwargs,
+    tab_data: torch.Tensor,
+    val_mask: list = None,
+    test_mask: list = None,
+    **kwargs,
 ):
     knn = KNN(**kwargs)
     edges = knn.get_edges(
@@ -171,8 +200,8 @@ def get_knn_adj(
 
 
 def edges_from_sample(
-        sample: Union[Type[np.ndarray], Type[torch.Tensor]],
-        edge_weights: Union[Type[torch.Tensor], Type[np.ndarray]] = None,
+    sample: Union[Type[np.ndarray], Type[torch.Tensor]],
+    edge_weights: Union[Type[torch.Tensor], Type[np.ndarray]] = None,
 ):
     edge_weights = (
         edge_weights
@@ -192,13 +221,13 @@ def edges_from_sample(
 
 
 def fill_data_gfp(
-        tab_data_,
-        knn_kwargs: dict,
-        gfp_kwargs: dict = {},
-        val_mask: list = None,
-        test_mask: list = None,
-        inter_sample_edges: torch.Tensor = None,
-        calc_knn: bool = True,
+    tab_data_,
+    knn_kwargs: dict,
+    gfp_kwargs: dict = {},
+    val_mask: list = None,
+    test_mask: list = None,
+    inter_sample_edges: torch.Tensor = None,
+    calc_knn: bool = True,
 ):
     assert calc_knn or inter_sample_edges is not None
 
@@ -208,8 +237,8 @@ def fill_data_gfp(
         )
 
         mean_dist_all = np.mean(dists, 1)
-        mean_dist_neigh = np.sort(dists, 1)[:, 1: knn_kwargs["k"] + 1].mean(1)
-        num_nulls = tab_data_[:, :tab_data_.shape[1] // 2].isnan().sum(1)
+        mean_dist_neigh = np.sort(dists, 1)[:, 1 : knn_kwargs["k"] + 1].mean(1)
+        num_nulls = tab_data_[:, : tab_data_.shape[1] // 2].isnan().sum(1)
 
     else:
         mean_dist_all = None
@@ -225,4 +254,11 @@ def fill_data_gfp(
 
     imputed_data_ = gfp.prop(tab_data_, inter_sample_edges)
 
-    return imputed_data_, knn_inter_sample_edges, mean_dist_all, mean_dist_neigh, num_nulls, dists
+    return (
+        imputed_data_,
+        knn_inter_sample_edges,
+        mean_dist_all,
+        mean_dist_neigh,
+        num_nulls,
+        dists,
+    )
