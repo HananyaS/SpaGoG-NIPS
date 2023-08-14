@@ -20,8 +20,8 @@ parser = argparse.ArgumentParser()
 
 str2bool = lambda x: x.lower() in ["true", "1"]
 
-parser.add_argument("--model", type=str, default="gnc")
-parser.add_argument("--dataset", type=str, default="Iris")
+parser.add_argument("--model", type=str)
+parser.add_argument("--dataset", type=str)
 parser.add_argument("--feature_selection", type=int, default=None)
 parser.add_argument("--verbosity", type=int, default=1)
 parser.add_argument("--kfolds", type=int, default=10)

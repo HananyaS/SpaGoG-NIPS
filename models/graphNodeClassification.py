@@ -176,7 +176,9 @@ class GraphNodeClassification(nn.Module, AbstractModel):
 
         if early_stopping_patience > 0:
             c = 0
-            max_val_auc = -np.inf
+            max_val_auc = 0
+            best_model = None
+            first_es_iter = True
 
         (
             graphs_train_loader,
@@ -355,16 +357,41 @@ class GraphNodeClassification(nn.Module, AbstractModel):
                 )
 
             if early_stopping_patience > 0:
-                if (val_final_auc + val_gc_auc) / 2 > max_val_auc:
-                    max_val_auc = val_final_auc
-                    c = 0
+                if (
+                    val_gc_auc not in [np.nan, None]
+                    and val_final_auc not in [np.nan, None]
+                    and min(val_gc_auc, val_final_auc) > 0
+                ):
+                    if (val_gc_auc + val_final_auc) / 2 > max_val_auc:
+                        max_val_auc = (val_gc_auc + val_final_auc) / 2
+                        c = 0
+                        best_model = self.state_dict()
+
+                    else:
+                        c += 1
 
                 else:
-                    c += 1
+                    if first_es_iter:
+                        if verbose:
+                            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+                            print("Optimizing by loss, AUC is not available")
+                            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+                        max_val_auc = np.inf
+
+                    if val_loss_total < max_val_auc:
+                        max_val_auc = val_loss_total
+                        c = 0
+                        best_model = self.state_dict()
+
+                    else:
+                        c += 1
+
+                first_es_iter = False
 
                 if c == early_stopping_patience:
                     if verbose:
-                        print(f"\nEarly stopping triggered at epoch {epoch}.\n")
+                        print(f"Early stopping triggered at epoch {epoch}")
+                    self.load_state_dict(best_model)
                     break
 
         best_epoch, best_val_total_loss = np.argmin(val_total_losses) + 1, np.min(
@@ -375,11 +402,7 @@ class GraphNodeClassification(nn.Module, AbstractModel):
 
         if verbose:
             print(
-                f"Best epoch is {best_epoch} with total loss of {np.round(best_val_total_loss, 4)} on val and AUC of {np.round(best_val_final_auc, 4)} on validation (final)"
-            )
-
-            print(
-                f"Max AUC on validation obtained is {np.max(val_final_aucs)} in epoch {np.argmax(val_final_aucs) + 1}"
+                f"Best epoch is {best_epoch} with total loss of {np.round(best_val_total_loss, 4)} on validation"
             )
 
         final_output_train, gc_output_train = self(
@@ -416,7 +439,8 @@ class GraphNodeClassification(nn.Module, AbstractModel):
                     best_loss = train_loss
                     best_beta = beta
 
-            print(f"Best beta is {best_beta} with loss of {best_loss} on training")
+            if verbose:
+                print(f"Best beta is {best_beta} with loss of {best_loss} on training")
 
         else:
             best_beta = int(clf_from == "nc")
@@ -424,7 +448,9 @@ class GraphNodeClassification(nn.Module, AbstractModel):
         mixed_output_train = (
             best_beta * final_output_train + (1 - best_beta) * gc_output_train
         )
-        mixed_output_val = best_beta * final_output_val + (1 - best_beta) * gc_output_val
+        mixed_output_val = (
+            best_beta * final_output_val + (1 - best_beta) * gc_output_val
+        )
 
         if given_test_y:
             mixed_output_test = (

@@ -150,7 +150,9 @@ class AbstractNN(nn.Module, AbstractModel):
 
         if early_stopping_patience > 0:
             c = 0
-            max_val_auc = np.inf
+            max_val_auc = 0
+            best_model = None
+            first_es_iter = True
 
         t_per_epoch = []
         t_per_train_epoch = []
@@ -248,16 +250,38 @@ class AbstractNN(nn.Module, AbstractModel):
                 )
 
             if early_stopping_patience > 0:
-                if val_auc > max_val_auc:
-                    max_val_auc = val_auc
-                    c = 0
+                if val_auc == val_auc and val_auc > 0:
+                    if val_auc > max_val_auc:
+                        max_val_auc = val_auc
+                        c = 0
+                        best_model = self.state_dict()
+
+                    else:
+                        c += 1
 
                 else:
-                    c += 1
+                    if first_es_iter:
+                        if verbose:
+                            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+                            print("Optimizing by loss, AUC is not available")
+                            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+                        max_val_auc = np.inf
+
+                    if total_val_loss < max_val_auc:
+                        max_val_auc = total_val_loss
+                        c = 0
+                        best_model = self.state_dict()
+
+                    else:
+                        c += 1
+
+                first_es_iter = False
 
                 if c == early_stopping_patience:
                     if verbose:
-                        print(f"\nEarly stopping triggered at epoch {epoch}\n")
+                        print(f"Early stopping triggered at epoch {epoch}")
+                    self.load_state_dict(best_model)
+
                     break
 
             t_per_epoch.append(time.time() - t_start)
